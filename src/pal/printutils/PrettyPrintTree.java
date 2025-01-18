@@ -1,4 +1,4 @@
-package ajs.printutils;
+package pal.printutils;
 
 import java.text.BreakIterator;
 import java.util.*;

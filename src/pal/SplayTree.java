@@ -4,68 +4,93 @@ class SplayTree {
     class Node {
         int key;
         Node left, right, parent;
-        Node(int key) { this.key = key; }
+
+        Node(int key) {
+            this.key = key;
+            this.left = null;
+            this.right = null;
+            this.parent = null;
+        }
     }
 
     Node root;
 
-    private Node zig(Node x) {
-        if (x == null || x.left == null) return x; // Prevent NullPointerException
-        Node p = x.left;
-        x.left = p.right;
-        p.right = x;
-        return p;
+    private boolean nodeEquals(Node a, Node b) {
+        return a == b;
     }
 
-    private Node zag(Node x) {
-        if (x == null || x.right == null) return x; // Prevent NullPointerException
-        Node p = x.right;
-        x.right = p.left;
-        p.left = x;
-        return p;
-    }
+    private void zig(Node x) {
+        Node p = x.parent;
+        if (p == null) return;
 
-
-
-    private Node splay(Node root, int key) {
-        if (root == null || root.key == key) return root;
-
-        // Key is in the left subtree
-        if (key < root.key) {
-            if (root.left == null) return root;
-
-            // Zig-zig case
-            if (key < root.left.key) {
-                root.left.left = splay(root.left.left, key);
-                root = zig(root);
-            }
-            // Zig-zag case
-            else if (key > root.left.key) {
-                root.left.right = splay(root.left.right, key);
-                if (root.left.right != null)
-                    root.left = zig(root.left);
-            }
-
-            return (root.left == null) ? root : zig(root);
+        p.left = x.right;
+        if (x.right != null) {
+            x.right.parent = p;
         }
+        x.right = p;
+        x.parent = p.parent;
+        p.parent = x;
 
-        // Key is in the right subtree
-        else {
-            if (root.right == null) return root;
-
-            // Zag-zag case
-            if (key > root.right.key) {
-                root.right.right = splay(root.right.right, key);
-                root = zag(root);
+        if (x.parent != null) {
+            if (nodeEquals(x.parent.left, p)) {
+                x.parent.left = x;
+            } else {
+                x.parent.right = x;
             }
-            // Zag-zig case
-            else if (key < root.right.key) {
-                root.right.left = splay(root.right.left, key);
-                if (root.right.left != null)
-                    root.right = zag(root.right);
-            }
+        } else {
+            root = x;
+        }
+    }
 
-            return (root.right == null) ? root : zag(root);
+    private void zag(Node x) {
+        Node p = x.parent;
+        if (p == null) return;
+
+        p.right = x.left;
+        if (x.left != null) {
+            x.left.parent = p;
+        }
+        x.left = p;
+        x.parent = p.parent;
+        p.parent = x;
+
+        if (x.parent != null) {
+            if (nodeEquals(x.parent.right, p)) {
+                x.parent.right = x;
+            } else {
+                x.parent.left = x;
+            }
+        } else {
+            root = x;
+        }
+    }
+
+    private void splay(Node x) {
+        while (x.parent != null) {
+            Node p = x.parent;
+            Node gp = p.parent;
+
+            if (gp == null) {
+                if (nodeEquals(p.left, x)) {
+                    zig(x);
+                } else {
+                    zag(x);
+                }
+            } else {
+                if (nodeEquals(p.left, x) && nodeEquals(gp.left, p)) {
+                    zig(p);
+                    zig(x);
+                } else if (nodeEquals(p.right, x) && nodeEquals(gp.right, p)) {
+                    zag(p);
+                    zag(x);
+                } else if (nodeEquals(p.left, x) && nodeEquals(gp.right, p)) {
+                    zig(x);
+                    zag(x);
+                } else {
+                    zag(x);
+                    zig(x);
+                }
+            }
         }
     }
 
@@ -75,45 +100,62 @@ class SplayTree {
             return;
         }
 
-        root = splay(root, key);
-        if (root.key == key) return;
+        Node node = root, parent = null;
+        while (node != null) {
+            parent = node;
+            if (key < node.key) {
+                node = node.left;
+            } else if (key > node.key) {
+                node = node.right;
+            } else {
+                splay(node);
+                return;
+            }
+        }
 
         Node newNode = new Node(key);
-        if (key < root.key) {
-            newNode.right = root;
-            newNode.left = root.left;
-            root.left = null;
+        newNode.parent = parent;
+        if (key < parent.key) {
+            parent.left = newNode;
         } else {
-            newNode.left = root;
-            newNode.right = root.right;
-            root.right = null;
+            parent.right = newNode;
         }
-        root = newNode;
 
+        splay(newNode);
     }
 
     public void delete(int key) {
-        if (root == null) return;
+        Node node = search(root, key);
+        if (node == null) return;
 
-        root = splay(root, key);
-        if (root.key != key) return;
+        splay(node);
 
-        if (root.left == null) {
-            root = root.right;
+        if (node.left == null) {
+            root = node.right;
+            if (root != null) root.parent = null;
         } else {
-            Node temp = root.right;
-            root = root.left;
-            root = splay(root, key); // Fix: Assign returned value to root
+            Node temp = node.right;
+            root = node.left;
+            root.parent = null;
+            Node maxLeft = root;
+            while (maxLeft.right != null) {
+                maxLeft = maxLeft.right;
+            }
+            splay(maxLeft);
             root.right = temp;
+            if (temp != null) temp.parent = root;
         }
     }
 
-    private Node search(int key) {
-        Node z = root;
-        while (z != null) {
-            if (key < z.key) z = z.left;
-            else if (key > z.key) z = z.right;
-            else return z;
+    private Node search(Node node, int key) {
+        while (node != null) {
+            if (key < node.key) {
+                node = node.left;
+            } else if (key > node.key) {
+                node = node.right;
+            } else {
+                return node;
+            }
         }
         return null;
     }
@@ -123,7 +165,7 @@ class SplayTree {
     }
 
     private int getHeight(Node node) {
-        if (node == null) return 0;
+        if (node == null) return -1;
         return 1 + Math.max(getHeight(node.left), getHeight(node.right));
     }
 }

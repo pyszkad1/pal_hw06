@@ -3,36 +3,66 @@ package pal;
 class ZigOnlySplayTree {
     class Node {
         int key;
-        Node left, right;
-
-        Node(int key) {
-            this.key = key;
-        }
+        Node left, right, parent;
+        Node(int key) { this.key = key; }
     }
 
     Node root;
 
-    // Only zig rotation
-    private Node zig(Node x) {
-        if (x == null || x.left == null) return x; // Prevent NullPointerException
-        Node p = x.left;
-        x.left = p.right;
-        p.right = x;
-        return p;
+    private void zig(Node x) {
+        Node p = x.parent;
+        if (p == null) return; // Root node, no rotation possible
+
+        p.left = x.right;
+        if (x.right != null) {
+            x.right.parent = p;
+        }
+        x.right = p;
+        x.parent = p.parent;
+        p.parent = x;
+
+        if (x.parent != null) {
+            if (x.parent.left == p) {
+                x.parent.left = x;
+            } else {
+                x.parent.right = x;
+            }
+        } else {
+            root = x;
+        }
     }
 
+    private void zag(Node x) {
+        Node p = x.parent;
+        if (p == null) return; // Root node, no rotation possible
 
-    private Node splay(Node root, int key) {
-        while (root != null && root.key != key) {
-            if (key < root.key && root.left != null) {
-                root = zig(root);
-            } else if (key > root.key && root.right != null) {
-                root.right = splay(root.right, key); // Ensure key moves up
+        p.right = x.left;
+        if (x.left != null) {
+            x.left.parent = p;
+        }
+        x.left = p;
+        x.parent = p.parent;
+        p.parent = x;
+
+        if (x.parent != null) {
+            if (x.parent.right == p) {
+                x.parent.right = x;
             } else {
-                break;
+                x.parent.left = x;
+            }
+        } else {
+            root = x;
+        }
+    }
+
+    private void splay(Node x) {
+        while (x.parent != null) {
+            if (x.parent.left == x) {
+                zig(x);
+            } else {
+                zag(x);
             }
         }
-        return root;
     }
 
     public void insert(int key) {
@@ -40,36 +70,63 @@ class ZigOnlySplayTree {
             root = new Node(key);
             return;
         }
-        root = splay(root, key);
-        if (root.key == key) return;
+
+        Node node = root, parent = null;
+        while (node != null) {
+            parent = node;
+            if (key < node.key) {
+                node = node.left;
+            } else if (key > node.key) {
+                node = node.right;
+            } else {
+                return; // Key already exists, do nothing
+            }
+        }
 
         Node newNode = new Node(key);
-        if (key < root.key) {
-            newNode.right = root;
-            newNode.left = root.left;
-            root.left = null;
+        newNode.parent = parent;
+        if (key < parent.key) {
+            parent.left = newNode;
         } else {
-            newNode.left = root;
-            newNode.right = root.right;
-            root.right = null;
+            parent.right = newNode;
         }
-        root = newNode;
+
+        splay(newNode);
     }
 
     public void delete(int key) {
-        if (root == null) return;
+        Node node = search(key);
+        if (node == null) return;
 
-        root = splay(root, key);
-        if (root == null || root.key != key) return; // Extra null check to prevent NPE
-
-        if (root.left == null) {
-            root = root.right;
+        splay(node);
+        if (node.left == null) {
+            root = node.right;
         } else {
-            Node temp = root.right;
-            root = root.left;
-            root = splay(root, key); // Fix: Assign returned value to root
-            root.right = temp;
+            Node maxLeft = node.left;
+            while (maxLeft.right != null) {
+                maxLeft = maxLeft.right;
+            }
+            splay(maxLeft);
+            maxLeft.right = node.right;
+            if (node.right != null) {
+                node.right.parent = maxLeft;
+            }
+            root = maxLeft;
         }
+    }
+
+    private Node search(int key) {
+        Node node = root;
+        while (node != null) {
+            if (key < node.key) {
+                node = node.left;
+            } else if (key > node.key) {
+                node = node.right;
+            } else {
+                return node;
+            }
+        }
+        return null;
     }
 
     public int getHeight() {
@@ -77,7 +134,7 @@ class ZigOnlySplayTree {
     }
 
     private int getHeight(Node node) {
-        if (node == null) return 0;
+        if (node == null) return -1;
         return 1 + Math.max(getHeight(node.left), getHeight(node.right));
     }
 }
